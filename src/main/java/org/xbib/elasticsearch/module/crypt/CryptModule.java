@@ -1,12 +1,12 @@
 package org.xbib.elasticsearch.module.crypt;
 
-import org.elasticsearch.common.inject.AbstractModule;
-import org.xbib.elasticsearch.index.mapper.crypt.CryptService;
+import org.elasticsearch.common.inject.Binder;
+import org.elasticsearch.common.inject.Module;
 
-public class CryptModule extends AbstractModule {
+public class CryptModule implements Module {
 
     @Override
-    public void configure() {
-        bind(CryptService.class).asEagerSingleton();
+    public void configure(Binder binder) {
+        binder.bind(RegisterCryptType.class).asEagerSingleton();
     }
 }

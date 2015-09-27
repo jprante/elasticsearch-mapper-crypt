@@ -1,251 +1,234 @@
 package org.xbib.elasticsearch.index.mapper.crypt;
 
-import org.elasticsearch.action.get.GetResponse;
-import org.elasticsearch.client.Client;
+import org.apache.lucene.document.Field;
+import org.apache.lucene.document.FieldType;
+import org.apache.lucene.document.SortedSetDocValuesField;
+import org.apache.lucene.index.FieldInfo;
+import org.apache.lucene.util.BytesRef;
+import org.elasticsearch.ElasticsearchIllegalArgumentException;
+import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.settings.Settings;
-import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentParser;
-import org.elasticsearch.index.mapper.FieldMapperListener;
+import org.elasticsearch.index.analysis.NamedAnalyzer;
+import org.elasticsearch.index.codec.docvaluesformat.DocValuesFormatProvider;
+import org.elasticsearch.index.codec.postingsformat.PostingsFormatProvider;
+import org.elasticsearch.index.fielddata.FieldDataType;
+import org.elasticsearch.index.mapper.FieldMapper;
 import org.elasticsearch.index.mapper.Mapper;
 import org.elasticsearch.index.mapper.MapperParsingException;
-import org.elasticsearch.index.mapper.MergeContext;
-import org.elasticsearch.index.mapper.MergeMappingException;
-import org.elasticsearch.index.mapper.ObjectMapperListener;
 import org.elasticsearch.index.mapper.ParseContext;
+import org.elasticsearch.index.mapper.core.AbstractFieldMapper;
+import org.elasticsearch.index.mapper.core.StringFieldMapper;
+import org.elasticsearch.index.similarity.SimilarityProvider;
 
 import java.io.IOException;
+import java.nio.charset.Charset;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.List;
 import java.util.Map;
 
-import static org.elasticsearch.common.collect.Lists.newLinkedList;
-import static org.elasticsearch.index.mapper.MapperBuilders.stringField;
+import static org.elasticsearch.index.mapper.core.TypeParsers.parseField;
+import static org.elasticsearch.index.mapper.core.TypeParsers.parseMultiField;
 
-public class CryptMapper implements Mapper {
+public class CryptMapper extends StringFieldMapper {
 
     public static final String CONTENT_TYPE = "crypt";
 
-    @SuppressWarnings({"rawtypes"})
-    public static class Builder extends Mapper.Builder<Builder, CryptMapper> {
+    @Override
+    public FieldDataType defaultFieldDataType() {
+        return new FieldDataType("string");
+    }
 
-        private Mapper.Builder contentBuilder;
+    @Override
+    protected String contentType() {
+        return CONTENT_TYPE;
+    }
 
-        private Mapper.Builder refBuilder;
+    public static class Builder extends StringFieldMapper.Builder {
 
-        private Client client;
+        private String algo;
 
-        private Settings clientSettings;
-
-        public Builder(String name, Client client, Settings clientSettings) {
+        public Builder(String name) {
             super(name);
             this.builder = this;
-            this.client = client;
-            this.clientSettings = clientSettings;
-            this.contentBuilder = stringField(name);
-            this.refBuilder = stringField("ref");
+            this.algo =  "SHA-256";
         }
 
-        public Builder content(Mapper.Builder content) {
-            this.contentBuilder = content;
-            return this;
-        }
-
-        public Builder ref(Mapper.Builder ref) {
-            this.refBuilder = ref;
+        public Builder algo(String algo) {
+            this.algo = algo;
             return this;
         }
 
         @Override
         public CryptMapper build(BuilderContext context) {
-            context.path().add(name);
-            Mapper contentMapper = contentBuilder.build(context);
-            Mapper refMapper = refBuilder.build(context);
-            context.path().remove();
-            return new CryptMapper(name, contentMapper, refMapper,
-                    client, clientSettings);
+            if (positionOffsetGap > 0) {
+                indexAnalyzer = new NamedAnalyzer(indexAnalyzer, positionOffsetGap);
+                searchAnalyzer = new NamedAnalyzer(searchAnalyzer, positionOffsetGap);
+                searchQuotedAnalyzer = new NamedAnalyzer(searchQuotedAnalyzer, positionOffsetGap);
+            }
+            FieldType defaultFieldType = new FieldType(Defaults.FIELD_TYPE);
+            if (fieldType.indexed() && !fieldType.tokenized()) {
+                defaultFieldType.setOmitNorms(true);
+                defaultFieldType.setIndexOptions(FieldInfo.IndexOptions.DOCS_ONLY);
+                if (!omitNormsSet && boost == Defaults.BOOST) {
+                    fieldType.setOmitNorms(true);
+                }
+                if (!indexOptionsSet) {
+                    fieldType.setIndexOptions(FieldInfo.IndexOptions.DOCS_ONLY);
+                }
+            }
+            defaultFieldType.freeze();
+            CryptMapper fieldMapper = new CryptMapper(buildNames(context),
+                    boost, fieldType, defaultFieldType, Boolean.FALSE, nullValue,
+                    indexAnalyzer, searchAnalyzer, searchQuotedAnalyzer,
+                    positionOffsetGap, ignoreAbove, postingsProvider, docValuesProvider, similarity, normsLoading,
+                    fieldDataSettings, context.indexSettings(), multiFieldsBuilder.build(this, context), copyTo, algo);
+            fieldMapper.includeInAll(includeInAll);
+            return fieldMapper;
         }
     }
 
-    @SuppressWarnings({"unchecked","rawtypes"})
     public static class TypeParser implements Mapper.TypeParser {
 
-        private final Client client;
-
-        private final Settings settings;
-
-        public TypeParser(Client client, Settings settings) {
-            this.client = client;
-            this.settings = settings;
-        }
-
+        @SuppressWarnings({"unchecked","rawtypes"})
         @Override
         public Mapper.Builder parse(String name, Map<String, Object> node, ParserContext parserContext)
                 throws MapperParsingException {
-            CryptMapper.Builder builder = new Builder(name, client, settings);
+            CryptMapper.Builder builder = new Builder(name);
+            parseField(builder, name, node, parserContext);
             for (Map.Entry<String, Object> entry : node.entrySet()) {
-                String fieldName = entry.getKey();
-                Object fieldNode = entry.getValue();
-                if (fieldName.equals("ref")) {
-                    builder.ref(parserContext.typeParser("string")
-                            .parse(name, (Map<String, Object>) fieldNode, parserContext));
+                String propName = Strings.toUnderscoreCase(entry.getKey());
+                Object propNode = entry.getValue();
+                if (propName.equals("algo")) {
+                    builder.algo(propNode.toString());
+                } else {
+                    parseMultiField(builder, name, parserContext, propName, propNode);
                 }
             }
             return builder;
         }
     }
 
-    private final String name;
+    private String nullValue;
+    private int ignoreAbove;
+    private final String algo;
 
-    private final Mapper contentMapper;
+    public CryptMapper(
+            FieldMapper.Names names,
+            float boost,
+            FieldType fieldType,
+            FieldType defaultFieldType,
+            Boolean docValues,
+            String nullValue,
+            NamedAnalyzer indexAnalyzer,
+            NamedAnalyzer searchAnalyzer,
+            NamedAnalyzer searchQuotedAnalyzer,
+            int positionOffsetGap,
+            int ignoreAbove,
+            PostingsFormatProvider postingsFormat,
+            DocValuesFormatProvider docValuesFormat,
+            SimilarityProvider similarity,
+            FieldMapper.Loading normsLoading,
+            Settings fieldDataSettings,
+            Settings indexSettings,
+            AbstractFieldMapper.MultiFields multiFields,
+            AbstractFieldMapper.CopyTo copyTo,
+            String algo
 
-    private final Mapper refMapper;
-
-    private final Client client;
-
-    private final Settings settings;
-
-    private String index;
-
-    private String type;
-
-    private String[] fields;
-
-    public CryptMapper(String name,
-                       Mapper contentMapper,
-                       Mapper refMapper,
-                       Client client, Settings settings) {
-        this.name = name;
-        this.contentMapper = contentMapper;
-        this.refMapper = refMapper;
-        this.client = client;
-        this.settings= settings;
+    ) {
+        super(names, boost, fieldType, defaultFieldType, docValues, nullValue,
+                indexAnalyzer, searchAnalyzer, searchQuotedAnalyzer, positionOffsetGap,
+                ignoreAbove, postingsFormat, docValuesFormat, similarity, normsLoading,
+                fieldDataSettings, indexSettings, multiFields, copyTo);
+        this.nullValue = nullValue;
+        this.ignoreAbove = ignoreAbove;
+        this.algo = algo;
     }
 
     @Override
-    public String name() {
-        return name;
+    protected void parseCreateField(ParseContext context, List<Field> fields) throws IOException {
+        ValueAndBoost valueAndBoost = parseCreateFieldForCrypt(context, nullValue, boost, algo);
+        if (valueAndBoost.value() == null) {
+            return;
+        }
+        if (ignoreAbove > 0 && valueAndBoost.value().length() > ignoreAbove) {
+            return;
+        }
+        if (fieldType.indexed() || fieldType.stored()) {
+            Field field = new Field(names.indexName(), valueAndBoost.value(), fieldType);
+            field.setBoost(valueAndBoost.boost());
+            fields.add(field);
+        }
+        if (hasDocValues()) {
+            fields.add(new SortedSetDocValuesField(names.indexName(), new BytesRef(valueAndBoost.value())));
+        }
+        if (fields.isEmpty()) {
+            context.ignoredValue(names.indexName(), valueAndBoost.value());
+        }
     }
 
-    @Override
-    public void parse(final ParseContext context) throws IOException {
-        String content = null;
+    static ValueAndBoost parseCreateFieldForCrypt(ParseContext context, String nullValue, float defaultBoost, String algo) throws IOException {
+        if (context.externalValueSet()) {
+            return new ValueAndBoost((String) context.externalValue(), defaultBoost);
+        }
         XContentParser parser = context.parser();
-        XContentParser.Token token = parser.currentToken();
-        if (token == XContentParser.Token.VALUE_STRING) {
-            content = parser.text();
-        } else {
+        if (parser.currentToken() == XContentParser.Token.VALUE_NULL) {
+            return new ValueAndBoost(nullValue, defaultBoost);
+        }
+        if (parser.currentToken() == XContentParser.Token.START_OBJECT) {
+            XContentParser.Token token;
             String currentFieldName = null;
+            String value = nullValue;
+            float boost = defaultBoost;
             while ((token = parser.nextToken()) != XContentParser.Token.END_OBJECT) {
                 if (token == XContentParser.Token.FIELD_NAME) {
                     currentFieldName = parser.currentName();
-                } else if (token == XContentParser.Token.VALUE_STRING) {
-                    switch (currentFieldName) {
-                        case "id":
-                            content = parser.text();
-                            break;
-                        case "index":
-                            index = parser.text();
-                            break;
-                        case "type":
-                            type = parser.text();
-                            break;
-                        case "fields":
-                            fields = new String[]{parser.text()};
-                            break;
-                    }
-                } else if (token == XContentParser.Token.START_ARRAY) {
-                    List<String> values = newLinkedList();
-                    while (parser.nextToken() != XContentParser.Token.END_ARRAY) {
-                        if (parser.text() != null) {
-                            values.add(parser.text());
-                        }
-                    }
-                    fields = values.toArray(new String[values.size()]);
-                }
-            }
-        }
-        if (content == null) {
-            // do not throw exception - silently ignore
-            return;
-        }
-        context.externalValue(content);
-        contentMapper.parse(context);
-        final String id = content;
-        if (index == null) {
-            // parse content for index/type/fields pattern
-            index = parseIndex(content);
-            type = parseType(content);
-            fields = parseFields(content);
-        }
-        if (index == null) {
-            // no parsed content, try settings
-            index = settings.get("ref_index");
-            type = settings.get("ref_type");
-            fields = settings.getAsArray("ref_fields");
-        }
-        if (index != null && type != null && fields != null) {
-            // get document from other index
-            GetResponse response = client.prepareGet()
-                    .setIndex(index)
-                    .setType(type)
-                    .setId(id)
-                    .setFields(fields)
-                    .get(TimeValue.timeValueSeconds(5));
-            if (response != null) {
-                for (String field : fields) {
-                    for (Object object : response.getField(field).getValues()) {
-                        context.externalValue(object);
-                        refMapper.parse(context);
+                } else {
+                    if ("value".equals(currentFieldName) || "_value".equals(currentFieldName)) {
+                        value = crypt(parser.textOrNull(), algo);
+                    } else if ("boost".equals(currentFieldName) || "_boost".equals(currentFieldName)) {
+                        boost = parser.floatValue();
+                    } else {
+                        throw new ElasticsearchIllegalArgumentException("unknown property [" + currentFieldName + "]");
                     }
                 }
             }
+            return new ValueAndBoost(value, boost);
         }
+        return new ValueAndBoost(crypt(parser.textOrNull(), algo), defaultBoost);
     }
 
     @Override
-    public void merge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
+    protected void doXContentBody(XContentBuilder builder, boolean includeDefaults, Params params) throws IOException {
+        super.doXContentBody(builder, includeDefaults, params);
+        builder.field("algo", algo);
     }
 
-    @Override
-    public void traverse(FieldMapperListener fieldMapperListener) {
-        contentMapper.traverse(fieldMapperListener);
-        refMapper.traverse(fieldMapperListener);
+    private static String crypt(String plainText, String algo) {
+        if (plainText == null) {
+            return null;
+        }
+        MessageDigest digest;
+        try {
+            digest = MessageDigest.getInstance(algo);
+            digest.update(plainText.getBytes(UTF8));
+            return '{' + algo + '}' + bytesToHex(digest.digest());
+        } catch (NoSuchAlgorithmException ex) {
+        }
+        return null;
     }
 
-    @Override
-    public void traverse(ObjectMapperListener objectMapperListener) {
-    }
+    private final static Charset UTF8 = Charset.forName("UTF-8");
 
-    @Override
-    public void close() {
-        contentMapper.close();
-        refMapper.close();
+    private static String bytesToHex(byte[] b) {
+        StringBuilder buf = new StringBuilder();
+        for (int i = 0; i < b.length; i++) {
+            buf.append(hexDigit[(b[i] >> 4) & 0x0f]).append(hexDigit[b[i] & 0x0f]);
+        }
+        return buf.toString();
     }
+    private final static char[] hexDigit = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
 
-    @Override
-    public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
-        builder.startObject(name);
-        builder.field("type", CONTENT_TYPE);
-        builder.startObject("fields");
-        contentMapper.toXContent(builder, params);
-        refMapper.toXContent(builder, params);
-        builder.endObject();
-        builder.endObject();
-        return builder;
-    }
-
-    private String parseIndex(String content) {
-        String[] s = content.split("/");
-        return s.length > 1 ? s[0] : null;
-    }
-
-    private String parseType(String content) {
-        String[] s = content.split("/");
-        return s.length > 1 ? s[1] : null;
-    }
-
-    private String[] parseFields(String content) {
-        String[] s = content.split("/");
-        return s.length > 2 ? s[2].split(",") : null;
-    }
 }

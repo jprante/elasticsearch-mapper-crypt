@@ -1,9 +1,0 @@
-{
-    "someType" : {
-        "properties" : {
-            "someField": {
-                "type" : "ref"
-             }
-        }
-    }
-}

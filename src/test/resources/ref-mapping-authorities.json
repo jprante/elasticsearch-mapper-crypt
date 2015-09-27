@@ -1,9 +1,0 @@
-{
-    "docs" : {
-        "properties" : {
-            "author": {
-                "type" : "ref"
-             }
-        }
-    }
-}

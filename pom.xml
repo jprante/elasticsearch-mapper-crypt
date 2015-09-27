@@ -7,16 +7,16 @@
 
     <groupId>org.xbib.elasticsearch.plugin</groupId>
     <artifactId>elasticsearch-mapper-crypt</artifactId>
-    <version>1.2.1.0</version>
+    <version>1.5.2.0</version>
 
     <packaging>jar</packaging>
 
     <name>elasticsearch-mapper-crypt</name>
-    <description>Crypted field mapper using symmetric key algorithms</description>
+    <description>Crypted field mapper for Elasticsearch</description>
 
     <url>http://github.com/jprante/elasticsearch-mapper-crpyt</url>
 
-    <inceptionYear>2014</inceptionYear>
+    <inceptionYear>2015</inceptionYear>
 
     <licenses>
         <license>
@@ -69,7 +69,7 @@
         <github.global.server>github</github.global.server>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <java.compile.version>1.7</java.compile.version>
-        <elasticsearch.version>1.2.1</elasticsearch.version>
+        <elasticsearch.version>1.5.2</elasticsearch.version>
     </properties>
 
     <dependencies>
@@ -83,25 +83,33 @@
         </dependency>
 
         <dependency>
-            <groupId>log4j</groupId>
-            <artifactId>log4j</artifactId>
-            <version>1.2.17</version>
+            <groupId>net.java.dev.jna</groupId>
+            <artifactId>jna</artifactId>
+            <version>4.1.0</version>
             <type>jar</type>
             <scope>test</scope>
         </dependency>
 
         <dependency>
-            <groupId>org.testng</groupId>
-            <artifactId>testng</artifactId>
-            <version>6.8.8</version>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.12</version>
             <type>jar</type>
             <scope>test</scope>
         </dependency>
 
         <dependency>
-            <groupId>org.hamcrest</groupId>
-            <artifactId>hamcrest-all</artifactId>
-            <version>1.1</version>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-slf4j-impl</artifactId>
+            <version>2.2</version>
+            <type>jar</type>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-core</artifactId>
+            <version>2.2</version>
             <type>jar</type>
             <scope>test</scope>
         </dependency>
@@ -113,7 +121,7 @@
             <extension>
                 <groupId>org.apache.maven.wagon</groupId>
                 <artifactId>wagon-ssh-external</artifactId>
-                <version>2.6</version>
+                <version>2.9</version>
             </extension>
         </extensions>
         <resources>
@@ -135,7 +143,7 @@
         <plugins>
             <plugin>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.1</version>
+                <version>3.3</version>
                 <configuration>
                     <encoding>UTF-8</encoding>
                     <source>${java.compile.version}</source>
@@ -147,7 +155,7 @@
             </plugin>
             <plugin>
                 <artifactId>maven-clean-plugin</artifactId>
-                <version>2.4.1</version>
+                <version>2.6</version>
                 <configuration>
                     <filesets>
                         <fileset>
@@ -158,11 +166,11 @@
             </plugin>
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>2.17</version>
+                <version>2.18.1</version>
                 <configuration>
                     <skipTests>false</skipTests>
                     <includes>
-                        <include>**/*Test.java</include>
+                        <include>**/*Tests.java</include>
                     </includes>
                 </configuration>
             </plugin>
@@ -180,7 +188,7 @@
             </plugin>
             <plugin>
                 <artifactId>maven-assembly-plugin</artifactId>
-                <version>2.4</version>
+                <version>2.5.5</version>
                 <configuration>
                     <finalName>${project.artifactId}-${project.version}</finalName>
                     <outputDirectory>${project.build.directory}/releases/</outputDirectory>
@@ -222,12 +230,8 @@
                 </configuration>
             </plugin>
             <plugin>
-                <artifactId>maven-project-info-reports-plugin</artifactId>
-                <version>2.7</version>
-            </plugin>
-            <plugin>
                 <artifactId>maven-javadoc-plugin</artifactId>
-                <version>2.9.1</version>
+                <version>2.10.3</version>
                 <configuration>
                     <encoding>${project.build.sourceEncoding}</encoding>
                     <locale>en</locale>
@@ -255,7 +259,7 @@
             <plugin>
                 <groupId>com.github.github</groupId>
                 <artifactId>site-maven-plugin</artifactId>
-                <version>0.9</version>
+                <version>0.12</version>
                 <configuration>
                     <message>Building site for ${project.version}</message>
                 </configuration>
@@ -275,7 +279,7 @@
         <plugins>
             <plugin>
                 <artifactId>maven-javadoc-plugin</artifactId>
-                <version>2.9.1</version>
+                <version>2.10.3</version>
                 <configuration>
                     <encoding>${project.build.sourceEncoding}</encoding>
                     <locale>en</locale>
@@ -285,7 +289,7 @@
             </plugin>
             <plugin>
                 <artifactId>maven-surefire-report-plugin</artifactId>
-                <version>2.17</version>
+                <version>2.18.1</version>
             </plugin>
         </plugins>
     </reporting>

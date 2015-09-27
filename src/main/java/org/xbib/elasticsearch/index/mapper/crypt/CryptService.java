@@ -153,35 +153,31 @@ public class CryptService extends AbstractLifecycleComponent<CryptService> {
         }
     }
 
-    public byte[] encrypt(String keyName, byte[] clearText)
+    public synchronized byte[] encrypt(String keyName, byte[] clearText)
             throws NoSuchAlgorithmException, InvalidKeySpecException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException {
         SecretKey secretKey = getKey(keyName);
         if (secretKey == null) {
             throw new InvalidKeyException("no key found for name " + keyName);
         }
-        synchronized (cipher) {
-            cipher.init(Cipher.ENCRYPT_MODE, secretKey, pbeParamSpec);
-            byte[] encryptedBytes = cipher.doFinal(clearText);
-            byte[] bytesToEncode = new byte[saltLength + encryptedBytes.length];
-            System.arraycopy(salt, 0, bytesToEncode, 0, saltLength);
-            System.arraycopy(encryptedBytes, 0, bytesToEncode, saltLength, encryptedBytes.length);
-            return bytesToEncode;
-        }
+        cipher.init(Cipher.ENCRYPT_MODE, secretKey, pbeParamSpec);
+        byte[] encryptedBytes = cipher.doFinal(clearText);
+        byte[] bytesToEncode = new byte[saltLength + encryptedBytes.length];
+        System.arraycopy(salt, 0, bytesToEncode, 0, saltLength);
+        System.arraycopy(encryptedBytes, 0, bytesToEncode, saltLength, encryptedBytes.length);
+        return bytesToEncode;
     }
 
-    public byte[] decrypt(String name, byte[] cipherText)
+    public synchronized byte[] decrypt(String name, byte[] cipherText)
             throws InvalidKeySpecException, InvalidAlgorithmParameterException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException {
         SecretKey secretKey = getKey(name);
         if (secretKey == null) {
             throw new InvalidKeyException("no key found for " + name);
         }
-        synchronized (cipher) {
-            cipher.init(Cipher.DECRYPT_MODE, secretKey, pbeParamSpec);
-            int decryptedBytesLength = cipherText.length - saltLength;
-            byte[] decryptedBytes = new byte[decryptedBytesLength];
-            System.arraycopy(cipherText, saltLength, decryptedBytes, 0, decryptedBytesLength);
-            return cipher.doFinal(decryptedBytes);
-        }
+        cipher.init(Cipher.DECRYPT_MODE, secretKey, pbeParamSpec);
+        int decryptedBytesLength = cipherText.length - saltLength;
+        byte[] decryptedBytes = new byte[decryptedBytesLength];
+        System.arraycopy(cipherText, saltLength, decryptedBytes, 0, decryptedBytesLength);
+        return cipher.doFinal(decryptedBytes);
     }
 
     private void removeCryptoRestrictions() throws ClassNotFoundException, NoSuchFieldException, IllegalAccessException {
