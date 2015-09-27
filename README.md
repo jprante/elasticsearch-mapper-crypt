@@ -9,7 +9,8 @@ The crypt mapper plugin can index the secure hash of a string field when indexin
 [Elasticsearch](http://github.com/elasticsearch/elasticsearch).
 
 This is useful for storing and retrieving content that must be protected by
-a cryptographic hash, like passwords.
+a cryptographic hash, like passwords, and the client is unable to create
+secure hashes (for whatever reasons).
 
 Default is the SHA-256 algorithm. You can use any secure hash algorithm that is
 supported by your JVM's `MessageDigest` class.
