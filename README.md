@@ -25,11 +25,11 @@ It is not recommended to use MD5. See also http://www.win.tue.nl/hashclash/rogue
 
 ## Compatibility matrix
 
-![Travis](https://travis-ci.org/jprante/elasticsearch-knapsack.png)
-
 | Elasticsearch  |   Plugin       | Release date |
 | -------------- | -------------- | ------------ |
-| 2.0.0-beta2    | 2.0.0-beta2.1  | Sep 27, 2015 |
+| 2.0.0-beta2    | 2.0.0-beta2.0  | Sep 27, 2015 |
+| 1.7.2          | 1.7.2.0        | Sep 27, 2015 |
+| 1.5.2          | 1.5.2.0        | Sep 27, 2015 |
 
 ## Installation 1.x
 
