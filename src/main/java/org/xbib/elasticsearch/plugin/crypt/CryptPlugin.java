@@ -3,14 +3,14 @@ package org.xbib.elasticsearch.plugin.crypt;
 import org.elasticsearch.common.inject.Inject;
 import org.elasticsearch.common.inject.Module;
 import org.elasticsearch.common.settings.Settings;
-import org.elasticsearch.plugins.AbstractPlugin;
+import org.elasticsearch.plugins.Plugin;
 import org.xbib.elasticsearch.module.crypt.CryptModule;
 
+import java.util.ArrayList;
 import java.util.Collection;
 
-import static org.elasticsearch.common.collect.Lists.newArrayList;
 
-public class CryptPlugin extends AbstractPlugin {
+public class CryptPlugin extends Plugin {
 
     private final Settings settings;
 
@@ -30,10 +30,10 @@ public class CryptPlugin extends AbstractPlugin {
     }
 
     @Override
-    public Collection<Class<? extends Module>> indexModules() {
-        Collection<Class<? extends Module>> modules = newArrayList();
+    public Collection<Module> indexModules(Settings indexSettings) {
+        Collection<Module> modules = new ArrayList<>();
         if (settings.getAsBoolean("plugins.cryptmapper.enabled", true)) {
-            modules.add(CryptModule.class);
+            modules.add(new CryptModule());
         }
         return modules;
     }
