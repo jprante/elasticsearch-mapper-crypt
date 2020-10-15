@@ -1,3 +1,5 @@
+:warning: **This repository will be removed soon without any further notice**
+
 ![SHA](https://github.com/jprante/elasticsearch-mapper-crypt/raw/master/src/site/resources/sha.jpg)
 
 Photo taken from https://www.flickr.com/photos/byzantiumbooks/15129679930
